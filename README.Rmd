@@ -111,7 +111,7 @@ evalTest <- archive.df[spl==F,]
 
 And now train the model.  
 
-```{r, results='asis'}
+```{r}
 set.seed(123)
 rfModelMeta <- randomForest(
     project.tags ~ species + tissues + ptm.names + instrument.names + submissionType, 
@@ -120,13 +120,15 @@ rfModelMeta <- randomForest(
 rfPredMeta <- predict(rfModelMeta, newdata=evalTest)
 t <- table(evalTest$project.tags, rfPredMeta)
 meta_accuracy <- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, split.table = Inf)
 ```
 
 We have a prediction accuracy of **`r meta_accuracy`** on the test data. We can 
 also see how the model struggles to predict on classes with very few cases and
-does better with large classes.  
+does better with large classes.   
 
+```{r}
+pander(t, style = "rmarkdown", split.table = Inf)
+```
 
 # Using text fields  
 

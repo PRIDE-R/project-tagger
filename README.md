@@ -122,31 +122,21 @@ rfModelMeta <- randomForest(
 rfPredMeta <- predict(rfModelMeta, newdata=evalTest)
 t <- table(evalTest$project.tags, rfPredMeta)
 meta_accuracy <- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, split.table = Inf)
+pander(t, style = "rmarkdown", split.table = Inf)
 ```
 
 
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-           &nbsp;             Biological   Biomedical   Cardiovascular   Chromosome-centric Human   Human Proteome Project   Metaproteomics   PRIME-XS Project   Technical 
-                                                                         Proteome Project (C-HPP)                                                                          
----------------------------- ------------ ------------ ---------------- -------------------------- ------------------------ ---------------- ------------------ -----------
-       **Biological**             38           8              0                     0                         0                    1                 0               1     
 
-       **Biomedical**             8            41             0                     0                         0                    0                 0               0     
-
-     **Cardiovascular**           0            1              0                     0                         0                    0                 0               0     
-
- **Chromosome-centric Human       0            0              0                     1                         0                    0                 0               0     
- Proteome Project (C-HPP)**                                                                                                                                                
-
- **Human Proteome Project**       0            0              0                     0                         0                    0                 0               0     
-
-     **Metaproteomics**           2            3              0                     0                         0                    0                 0               0     
-
-    **PRIME-XS Project**          0            3              0                     0                         0                    0                 0               0     
-
-       **Technical**              2            2              0                     0                         0                    0                 0               1     
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+|                         &nbsp;                          |  Biological  |  Biomedical  |  Cardiovascular  |  Chromosome-centric Human Proteome Project (C-HPP)  |  Human Proteome Project  |  Metaproteomics  |  PRIME-XS Project  |  Technical  |
+|:-------------------------------------------------------:|:------------:|:------------:|:----------------:|:---------------------------------------------------:|:------------------------:|:----------------:|:------------------:|:-----------:|
+|                     **Biological**                      |      38      |      8       |        0         |                          0                          |            0             |        1         |         0          |      1      |
+|                     **Biomedical**                      |      8       |      41      |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                   **Cardiovascular**                    |      0       |      1       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|  **Chromosome-centric Human Proteome Project (C-HPP)**  |      0       |      0       |        0         |                          1                          |            0             |        0         |         0          |      0      |
+|               **Human Proteome Project**                |      0       |      0       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                   **Metaproteomics**                    |      2       |      3       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                  **PRIME-XS Project**                   |      0       |      3       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                      **Technical**                      |      2       |      2       |        0         |                          0                          |            0             |        0         |         0          |      1      |
 
 We have a prediction accuracy of **0.7232143** on the test data. We can 
 also see how the model struggles to predict on classes with very few cases and
