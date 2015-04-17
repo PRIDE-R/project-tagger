@@ -411,7 +411,7 @@ frequencies by project tag (remember they are <strong>stemmed</strong>):  </p>
 <div class="highlight highlight-r"><pre><span class="pl-smi">allWords</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span>
 panderOptions(<span class="pl-s"><span class="pl-pds">'</span>round<span class="pl-pds">'</span></span>, <span class="pl-c1">2</span>)
 panderOptions(<span class="pl-s"><span class="pl-pds">'</span>keep.trailing.zeros<span class="pl-pds">'</span></span>, <span class="pl-c1">TRUE</span>)
-pander(t(aggregate(.<span class="pl-k">~</span><span class="pl-smi">project.tag</span>, <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">allWords</span>, <span class="pl-smi">mean</span>)), <span class="pl-v">style</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>rmarkdown<span class="pl-pds">"</span></span>, <span class="pl-v">split.table</span> <span class="pl-k">=</span> <span class="pl-c1">Inf</span>)</pre></div>
+pander(t(aggregate(.<span class="pl-k">~</span><span class="pl-smi">project.tag</span>, <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">allWords</span>, <span class="pl-smi">mean</span>)), <span class="pl-v">round</span><span class="pl-k">=</span><span class="pl-c1">4</span>, <span class="pl-v">style</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>rmarkdown<span class="pl-pds">"</span></span>, <span class="pl-v">split.table</span> <span class="pl-k">=</span> <span class="pl-c1">Inf</span>)</pre></div>
 
 <table>
 <thead>
@@ -843,7 +843,7 @@ selected in the previous process using textual data.  </p>
 <span class="pl-smi">meta_text_accuracy</span> <span class="pl-k">&lt;-</span> (<span class="pl-smi">t</span>[<span class="pl-c1">1</span>,<span class="pl-c1">1</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">2</span>,<span class="pl-c1">2</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">3</span>,<span class="pl-c1">3</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">4</span>,<span class="pl-c1">4</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">5</span>,<span class="pl-c1">5</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">6</span>,<span class="pl-c1">6</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">7</span>,<span class="pl-c1">7</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">8</span>,<span class="pl-c1">8</span>]) <span class="pl-k">/</span> nrow(<span class="pl-smi">evalTest</span>)</pre></div>
 
 <p>We obtain an accuracy of <strong>0.75</strong>. The improvement is actually
-in better predicting the <code>biological</code> and metaproteomics classes a bit.  </p>
+in better predicting the <code>biological</code> and <code>technical</code> classes a bit.  </p>
 
 <table>
 <thead>
