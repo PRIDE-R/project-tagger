@@ -1,0 +1,1002 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Project-tagger by PRIDE-R</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Project-tagger</h1>
+        <p>A model to automatically assign project tags</p>
+
+        <p class="view"><a href="https://github.com/PRIDE-R/project-tagger">View the Project on GitHub <small>PRIDE-R/project-tagger</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/PRIDE-R/project-tagger/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/PRIDE-R/project-tagger/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/PRIDE-R/project-tagger">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a id="pride-archive-project-tagger" class="anchor" href="#pride-archive-project-tagger" aria-hidden="true"><span class="octicon octicon-link"></span></a>PRIDE Archive Project Tagger</h1>
+
+<p>Jose A. Dianes<br>
+6 April 2015  </p>
+
+<h1>
+<a id="introduction-and-goals" class="anchor" href="#introduction-and-goals" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction and Goals</h1>
+
+<p>The <a href="http://www.ebi.ac.uk/pride/archive">PRIDE Archive</a> uses a system of tags 
+to classify datasets. So far these tags are manually assigned by curators. So 
+far the PRIDE teach considers the following tags:  </p>
+
+<ul>
+<li>Biological<br>
+</li>
+<li>Biomedical<br>
+</li>
+<li>Cardiovascular<br>
+</li>
+<li>Chromosome-centric Human Proteome Project (C-HPP)<br>
+</li>
+<li>Human Proteome Project<br>
+</li>
+<li>Metaproteomics<br>
+</li>
+<li>PRIME-XS Project<br>
+</li>
+<li>Technical<br>
+</li>
+</ul>
+
+<p>In the present analysis, by trying to build a model that predict tags, we want
+to find out what are behind those tags. Is it information such as a project
+species or tissue relevant to identify a project as biomedical? Is it that
+information actually hidden in the dataset textual description?  </p>
+
+<h1>
+<a id="getting-and-cleaning-the-data" class="anchor" href="#getting-and-cleaning-the-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Getting and cleaning the data</h1>
+
+<p>Let's start by getting the latest <code>prideR</code> version form <code>GitHub</code>, together with 
+some other packages we will use to build our model.  </p>
+
+<div class="highlight highlight-r"><pre>library(<span class="pl-smi">devtools</span>)
+install_github(<span class="pl-s"><span class="pl-pds">"</span>PRIDE-R/prideR<span class="pl-pds">"</span></span>)
+library(<span class="pl-smi">prideR</span>)
+require(<span class="pl-smi">ggplot2</span>)
+theme_set(theme_linedraw())
+require(<span class="pl-smi">tm</span>)
+library(<span class="pl-smi">caTools</span>)
+library(<span class="pl-smi">randomForest</span>)
+library(<span class="pl-smi">pander</span>)</pre></div>
+
+<p>Now we get all the projects available in the archive.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">archive.df</span> <span class="pl-k">&lt;-</span> as.data.frame(search.list.ProjectSummary(<span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>,<span class="pl-c1">0</span>,<span class="pl-c1">20000</span>))</pre></div>
+
+<p>Kepp only those with a project tag assigned.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">archive.df</span> <span class="pl-k">&lt;-</span> subset(<span class="pl-smi">archive.df</span>, <span class="pl-smi">project.tags</span><span class="pl-k">!=</span><span class="pl-s"><span class="pl-pds">"</span>Not available<span class="pl-pds">"</span></span>)</pre></div>
+
+<h1>
+<a id="the-tags-distribution" class="anchor" href="#the-tags-distribution" aria-hidden="true"><span class="octicon octicon-link"></span></a>The tags distribution</h1>
+
+<p>Now we have 619 tagged projects in the dataset. Let's have a 
+quick look at how these tags are distributed.  </p>
+
+<div class="highlight highlight-r"><pre>ggplot(<span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">archive.df</span>, aes(<span class="pl-v">x</span><span class="pl-k">=</span>as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tags</span>))) <span class="pl-k">+</span>
+    geom_bar() <span class="pl-k">+</span>
+    coord_flip( ) <span class="pl-k">+</span>
+    ylab(<span class="pl-s"><span class="pl-pds">"</span>Number of Projects<span class="pl-pds">"</span></span>) <span class="pl-k">+</span>
+    xlab(<span class="pl-s"><span class="pl-pds">"</span>Project Tag<span class="pl-pds">"</span></span>)</pre></div>
+
+<p><img src="https://github.com/PRIDE-R/project-tagger/blob/master/README_files/figure-html/unnamed-chunk-4-1.png?raw=true" alt=""> </p>
+
+<p>As we see, our data project tag distribution is very skewed. This will make 
+difficult to build good models, specially now that we have very few projects.  </p>
+
+<h1>
+<a id="using-meta-data" class="anchor" href="#using-meta-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using meta-data</h1>
+
+<p>Let's start by trying to predict projects tags based on meta-data only. That is,
+by using information such as the <em>species</em>, <em>tissues</em>, and so on.  </p>
+
+<h2>
+<a id="preparing-meta-data" class="anchor" href="#preparing-meta-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preparing meta-data</h2>
+
+<p>Right now we have all the metadata associated to PRIDE datasets in text format.
+In order to use it to build a model we better convert it to categorica data.
+However, most of them have too many differnet values for R machine libraries to
+make use of them as predictors. For that reason we need to aggregate those low
+frequency values into a unique <code>Other</code> factor level.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">species.counts</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">species</span>)
+<span class="pl-smi">low.freq.species</span> <span class="pl-k">&lt;-</span> as.factor(names(which(<span class="pl-smi">species.counts</span><span class="pl-k">&lt;</span><span class="pl-c1">3</span>)))
+<span class="pl-smi">archive.df</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">species</span> <span class="pl-k">%in%</span> <span class="pl-smi">low.freq.species</span>,]<span class="pl-k">$</span><span class="pl-smi">species</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>Other<span class="pl-pds">"</span></span>
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">species</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">species</span>)
+
+<span class="pl-smi">tissues.counts</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">tissues</span>)
+<span class="pl-smi">low.freq.tissues</span> <span class="pl-k">&lt;-</span> as.factor(names(which(<span class="pl-smi">tissues.counts</span><span class="pl-k">&lt;</span><span class="pl-c1">3</span>)))
+<span class="pl-smi">archive.df</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">tissues</span> <span class="pl-k">%in%</span> <span class="pl-smi">low.freq.tissues</span>,]<span class="pl-k">$</span><span class="pl-smi">tissues</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>Other<span class="pl-pds">"</span></span>
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">tissues</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">tissues</span>)
+
+<span class="pl-smi">ptm.counts</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">ptm.names</span>)
+<span class="pl-smi">low.freq.ptm</span> <span class="pl-k">&lt;-</span> as.factor(names(which(<span class="pl-smi">ptm.counts</span><span class="pl-k">&lt;</span><span class="pl-c1">3</span>)))
+<span class="pl-smi">archive.df</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">ptm.names</span> <span class="pl-k">%in%</span> <span class="pl-smi">low.freq.ptm</span>,]<span class="pl-k">$</span><span class="pl-smi">ptm.names</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>Other<span class="pl-pds">"</span></span>
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">ptm.names</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">ptm.names</span>)
+
+<span class="pl-smi">instrument.counts</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">instrument.names</span>)
+<span class="pl-smi">low.freq.instrument</span> <span class="pl-k">&lt;-</span> as.factor(names(which(<span class="pl-smi">instrument.counts</span><span class="pl-k">&lt;</span><span class="pl-c1">3</span>)))
+<span class="pl-smi">archive.df</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">instrument.names</span> <span class="pl-k">%in%</span> <span class="pl-smi">low.freq.instrument</span>,]<span class="pl-k">$</span><span class="pl-smi">instrument.names</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>Other<span class="pl-pds">"</span></span>
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">instrument.names</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">instrument.names</span>)
+
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tags</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tags</span>)
+<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">submissionType</span> <span class="pl-k">&lt;-</span> as.factor(<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">submissionType</span>)</pre></div>
+
+<h2>
+<a id="exploring-metadata" class="anchor" href="#exploring-metadata" aria-hidden="true"><span class="octicon octicon-link"></span></a>Exploring metadata</h2>
+
+<p>Let's explore a bit how each piece of metadata is distributed accross each 
+project tag. This might give us some insight into useful predictos if we
+find any species, tissue, etc., more present in a particular tag than others.  </p>
+
+<p>For that we will build a linear model and check the statistical importance of each
+predictor.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">meta_log_model</span> <span class="pl-k">&lt;-</span> glm(
+    <span class="pl-smi">project.tags</span> <span class="pl-k">~</span> <span class="pl-smi">species</span> <span class="pl-k">+</span> <span class="pl-smi">tissues</span> <span class="pl-k">+</span> <span class="pl-smi">ptm.names</span> <span class="pl-k">+</span> <span class="pl-smi">instrument.names</span> <span class="pl-k">+</span> <span class="pl-smi">num.assays</span> <span class="pl-k">+</span> <span class="pl-smi">submissionType</span>, 
+    <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">archive.df</span>, 
+    <span class="pl-v">family</span><span class="pl-k">=</span><span class="pl-smi">binomial</span>)</pre></div>
+
+<pre><code>## Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
+</code></pre>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">meta_log_model_summary</span> <span class="pl-k">&lt;-</span> summary(<span class="pl-smi">meta_log_model</span>)
+<span class="pl-smi">relevant_meta</span> <span class="pl-k">&lt;-</span> names(which(<span class="pl-smi">meta_log_model_summary</span><span class="pl-k">$</span><span class="pl-smi">coefficients</span>[,<span class="pl-c1">4</span>]<span class="pl-k">&lt;</span><span class="pl-c1">0.05</span>))</pre></div>
+
+<p>And we see that the following predictors are statistically significan when 
+predicting tags <strong>assuming a linear relationship</strong>:  </p>
+
+<table>
+<thead>
+<tr>
+<th align="center">Predictor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center">speciesHomo sapiens (Human)</td>
+</tr>
+<tr>
+<td align="center">speciesMus musculus (Mouse)</td>
+</tr>
+<tr>
+<td align="center">speciesRattus norvegicus (Rat)</td>
+</tr>
+<tr>
+<td align="center">speciesSus scrofa domesticus (domestic pig)</td>
+</tr>
+<tr>
+<td align="center">submissionTypePRIDE</td>
+</tr>
+</tbody>
+</table>
+
+<p>We cannot conclude much due to two factors. First, our relationship is surely
+not linear. And second, our dataset is too small to model better relationships.
+But at least it seems to be some relationship between <em>species</em>, and 
+<em>submission type</em>, and the project tag.  </p>
+
+<h2>
+<a id="a-meta-data-only-model" class="anchor" href="#a-meta-data-only-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>A meta-data only model</h2>
+
+<p>Let's try now a <em>Random Forest</em> model using just metadata predictors. We know 
+our dependent variable is very skewed, so don't expect too much accuracy. We 
+decide for this type of model due to its success with non-linear problems.  </p>
+
+<p>First of all, prepare a train/test split so we can check accuracy. We also 
+have the problem of having too few data in general. Hopefully our models will
+get better while PRIDE datasets get more numerous.  </p>
+
+<div class="highlight highlight-r"><pre>set.seed(<span class="pl-c1">123</span>)
+<span class="pl-smi">spl</span> <span class="pl-k">&lt;-</span> sample.split(<span class="pl-smi">archive.df</span>, .<span class="pl-c1">85</span>)
+
+<span class="pl-smi">evalTrain</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">archive.df</span>[<span class="pl-smi">spl</span><span class="pl-k">==</span><span class="pl-c1">T</span>,]
+<span class="pl-smi">evalTest</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">archive.df</span>[<span class="pl-smi">spl</span><span class="pl-k">==</span><span class="pl-c1">F</span>,]</pre></div>
+
+<p>And now train the model.  </p>
+
+<div class="highlight highlight-r"><pre>set.seed(<span class="pl-c1">123</span>)
+<span class="pl-smi">rfModelMeta</span> <span class="pl-k">&lt;-</span> randomForest(
+    <span class="pl-smi">project.tags</span> <span class="pl-k">~</span> <span class="pl-smi">species</span> <span class="pl-k">+</span> <span class="pl-smi">tissues</span> <span class="pl-k">+</span> <span class="pl-smi">ptm.names</span> <span class="pl-k">+</span> <span class="pl-smi">instrument.names</span> <span class="pl-k">+</span> <span class="pl-smi">submissionType</span>, 
+    <span class="pl-v">data</span> <span class="pl-k">=</span> <span class="pl-smi">evalTrain</span>)
+<span class="pl-c"># Calculate accuracy on the test set</span>
+<span class="pl-smi">rfPredMeta</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">rfModelMeta</span>, <span class="pl-v">newdata</span><span class="pl-k">=</span><span class="pl-smi">evalTest</span>)
+<span class="pl-smi">t</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">project.tags</span>, <span class="pl-smi">rfPredMeta</span>)
+<span class="pl-smi">meta_accuracy</span> <span class="pl-k">&lt;-</span> (<span class="pl-smi">t</span>[<span class="pl-c1">1</span>,<span class="pl-c1">1</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">2</span>,<span class="pl-c1">2</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">3</span>,<span class="pl-c1">3</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">4</span>,<span class="pl-c1">4</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">5</span>,<span class="pl-c1">5</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">6</span>,<span class="pl-c1">6</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">7</span>,<span class="pl-c1">7</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">8</span>,<span class="pl-c1">8</span>]) <span class="pl-k">/</span> nrow(<span class="pl-smi">evalTest</span>)</pre></div>
+
+<p>We have a prediction accuracy of <strong>0.7232143</strong> on the test data. We can 
+also see how the model struggles to predict on classes with very few cases and
+does better with large classes.   </p>
+
+<table>
+<thead>
+<tr>
+<th align="center"> </th>
+<th align="center">Biological</th>
+<th align="center">Biomedical</th>
+<th align="center">Cardiovascular</th>
+<th align="center">Chromosome-centric Human Proteome Project (C-HPP)</th>
+<th align="center">Human Proteome Project</th>
+<th align="center">Metaproteomics</th>
+<th align="center">PRIME-XS Project</th>
+<th align="center">Technical</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><strong>Biological</strong></td>
+<td align="center">38</td>
+<td align="center">8</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center"><strong>Biomedical</strong></td>
+<td align="center">8</td>
+<td align="center">41</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Cardiovascular</strong></td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Chromosome-centric Human Proteome Project (C-HPP)</strong></td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Human Proteome Project</strong></td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Metaproteomics</strong></td>
+<td align="center">2</td>
+<td align="center">3</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>PRIME-XS Project</strong></td>
+<td align="center">0</td>
+<td align="center">3</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Technical</strong></td>
+<td align="center">2</td>
+<td align="center">2</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+</tr>
+</tbody>
+</table>
+
+<h1>
+<a id="using-text-fields" class="anchor" href="#using-text-fields" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using text fields</h1>
+
+<p>Surely PRIDE curators use textual description about datasets in order to assign
+a tag to them. Let's try to incorporate that information into our models in order
+to predict a dataset tag.  </p>
+
+<h2>
+<a id="preparing-the-corpus" class="anchor" href="#preparing-the-corpus" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preparing the corpus</h2>
+
+<p>We have two textual fields, <code>project.title</code> and  <code>project.description</code>. Let's 
+prepare a corpus with both of them. In both cases we will reduce them to 
+lowercase, remove punctuation and stopwords, and apply stemming.   </p>
+
+<div class="highlight highlight-r"><pre>library(<span class="pl-smi">tm</span>)
+<span class="pl-smi">evalTrain</span><span class="pl-k">$</span><span class="pl-smi">AllText</span> <span class="pl-k">&lt;-</span> do.call(<span class="pl-smi">paste</span>, <span class="pl-smi">evalTrain</span>[,c(<span class="pl-s"><span class="pl-pds">"</span>project.title<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>project.description<span class="pl-pds">"</span></span>)])
+<span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">AllText</span> <span class="pl-k">&lt;-</span> do.call(<span class="pl-smi">paste</span>, <span class="pl-smi">evalTest</span>[,c(<span class="pl-s"><span class="pl-pds">"</span>project.title<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>project.description<span class="pl-pds">"</span></span>)])
+
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> Corpus(VectorSource(c(<span class="pl-smi">evalTrain</span><span class="pl-k">$</span><span class="pl-smi">AllText</span>, <span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">AllText</span>)))
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">tolower</span>)
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">PlainTextDocument</span>)
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">removePunctuation</span>)
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">removeWords</span>, stopwords(<span class="pl-s"><span class="pl-pds">"</span>english<span class="pl-pds">"</span></span>))
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">stripWhitespace</span>)
+<span class="pl-smi">corpusAll</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusAll</span>, <span class="pl-smi">stemDocument</span>)</pre></div>
+
+<p>We will also keep just those terms appearing in at least 3 percent of the projects.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-c"># Generate term matrix</span>
+<span class="pl-smi">dtmAll</span> <span class="pl-k">&lt;-</span> DocumentTermMatrix(<span class="pl-smi">corpusAll</span>)
+<span class="pl-smi">sparseAll</span> <span class="pl-k">&lt;-</span> removeSparseTerms(<span class="pl-smi">dtmAll</span>, <span class="pl-c1">0.99</span>)
+<span class="pl-smi">allWords</span> <span class="pl-k">&lt;-</span> <span class="pl-k">data.frame</span>(as.matrix(<span class="pl-smi">sparseAll</span>))
+
+colnames(<span class="pl-smi">allWords</span>) <span class="pl-k">&lt;-</span> make.names(colnames(<span class="pl-smi">allWords</span>))</pre></div>
+
+<h2>
+<a id="selecting-significative-terms" class="anchor" href="#selecting-significative-terms" aria-hidden="true"><span class="octicon octicon-link"></span></a>Selecting significative terms</h2>
+
+<p>We have ended up with <strong>214 possible predictors</strong>. But we can do 
+better than this. We are going to train a <em>linear model</em> using them and our
+dependent variable as outcome. Then we will get those variables that are
+statistically significative and incorporate them to the main dataset that
+we will use with our final model.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-c"># Find most significative terms</span>
+<span class="pl-smi">allWordsTrain2</span> <span class="pl-k">&lt;-</span> head(<span class="pl-smi">allWords</span>, nrow(<span class="pl-smi">evalTrain</span>))
+<span class="pl-smi">allWordsTrain2</span><span class="pl-k">$</span><span class="pl-smi">Popular</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">evalTrain</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span>
+<span class="pl-smi">logModelAllWords</span> <span class="pl-k">&lt;-</span> glm(<span class="pl-smi">Popular</span><span class="pl-k">~</span>., <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">allWordsTrain2</span>, <span class="pl-v">family</span><span class="pl-k">=</span><span class="pl-smi">binomial</span>)
+<span class="pl-smi">all_three_star_terms</span> <span class="pl-k">&lt;-</span> names(which(summary(<span class="pl-smi">logModelAllWords</span>)<span class="pl-k">$</span><span class="pl-smi">coefficients</span>[,<span class="pl-c1">4</span>]<span class="pl-k">&lt;</span><span class="pl-c1">0.001</span>))
+<span class="pl-smi">all_two_star_terms</span> <span class="pl-k">&lt;-</span> names(which(summary(<span class="pl-smi">logModelAllWords</span>)<span class="pl-k">$</span><span class="pl-smi">coefficients</span>[,<span class="pl-c1">4</span>]<span class="pl-k">&lt;</span><span class="pl-c1">0.01</span>))
+<span class="pl-smi">all_one_star_terms</span> <span class="pl-k">&lt;-</span> names(which(summary(<span class="pl-smi">logModelAllWords</span>)<span class="pl-k">$</span><span class="pl-smi">coefficients</span>[,<span class="pl-c1">4</span>]<span class="pl-k">&lt;</span><span class="pl-c1">0.05</span>))
+
+<span class="pl-c"># Leave just those terms that are different between popular and unpopular articles</span>
+<span class="pl-smi">allWords</span> <span class="pl-k">&lt;-</span> subset(<span class="pl-smi">allWords</span>, 
+                   <span class="pl-v">select</span><span class="pl-k">=</span>names(<span class="pl-smi">allWords</span>) <span class="pl-k">%in%</span> <span class="pl-smi">all_one_star_terms</span>)
+
+<span class="pl-c"># Split again</span>
+<span class="pl-smi">allWordsTrain</span> <span class="pl-k">&lt;-</span> head(<span class="pl-smi">allWords</span>, nrow(<span class="pl-smi">evalTrain</span>))
+<span class="pl-smi">allWordsTest</span> <span class="pl-k">&lt;-</span> tail(<span class="pl-smi">allWords</span>, nrow(<span class="pl-smi">evalTest</span>))
+
+<span class="pl-c"># Add to dataframes</span>
+<span class="pl-smi">evalTrain</span> <span class="pl-k">&lt;-</span> cbind(<span class="pl-smi">evalTrain</span>, <span class="pl-smi">allWordsTrain</span>)
+<span class="pl-smi">evalTest</span> <span class="pl-k">&lt;-</span> cbind(<span class="pl-smi">evalTest</span>, <span class="pl-smi">allWordsTest</span>)
+
+<span class="pl-c"># Remove all text variable since we don't need it</span>
+<span class="pl-smi">evalTrain</span><span class="pl-k">$</span><span class="pl-smi">AllText</span> <span class="pl-k">&lt;-</span> <span class="pl-c1">NULL</span>
+<span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">AllText</span> <span class="pl-k">&lt;-</span> <span class="pl-c1">NULL</span></pre></div>
+
+<p>We ended up with just <strong>35 predictors</strong> that will be 
+incorporated into our model. These are the terms together with their mean 
+frequencies by project tag (remember they are <strong>stemmed</strong>):  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allWords</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span>
+panderOptions(<span class="pl-s"><span class="pl-pds">'</span>round<span class="pl-pds">'</span></span>, <span class="pl-c1">2</span>)
+panderOptions(<span class="pl-s"><span class="pl-pds">'</span>keep.trailing.zeros<span class="pl-pds">'</span></span>, <span class="pl-c1">TRUE</span>)
+pander(t(aggregate(.<span class="pl-k">~</span><span class="pl-smi">project.tag</span>, <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-smi">allWords</span>, <span class="pl-smi">mean</span>)), <span class="pl-v">style</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>rmarkdown<span class="pl-pds">"</span></span>, <span class="pl-v">split.table</span> <span class="pl-k">=</span> <span class="pl-c1">Inf</span>)</pre></div>
+
+<table>
+<thead>
+<tr>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+<th align="center"></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><strong>project.tag</strong></td>
+<td align="center">Biological</td>
+<td align="center">Biomedical</td>
+<td align="center">Cardiovascular</td>
+<td align="center">Chromosome-centric Human Proteome Project (C-HPP)</td>
+<td align="center">Human Proteome Project</td>
+<td align="center">Metaproteomics</td>
+<td align="center">PRIME-XS Project</td>
+<td align="center">Technical</td>
+</tr>
+<tr>
+<td align="center"><strong>aim</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>analysi</strong></td>
+<td align="center">0.19245283</td>
+<td align="center">0.20220588</td>
+<td align="center">0.42857143</td>
+<td align="center">0.16666667</td>
+<td align="center">0.50000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.08333333</td>
+<td align="center">0.20588235</td>
+</tr>
+<tr>
+<td align="center"><strong>biolog</strong></td>
+<td align="center">0.026415094</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.000000000</td>
+</tr>
+<tr>
+<td align="center"><strong>biomark</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>brain</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>combin</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02941176</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>comparison</strong></td>
+<td align="center">0.003773585</td>
+<td align="center">0.011029412</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.166666667</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr>
+<td align="center"><strong>comprehens</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.03308824</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>control</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>crucial</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>dataset</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>determin</strong></td>
+<td align="center">0.018867925</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.066666667</td>
+<td align="center">0.000000000</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr>
+<td align="center"><strong>develop</strong></td>
+<td align="center">0.05283019</td>
+<td align="center">0.03308824</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>differ</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.04044118</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.11764706</td>
+</tr>
+<tr>
+<td align="center"><strong>digest</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.142857143</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.250000000</td>
+<td align="center">0.058823529</td>
+</tr>
+<tr>
+<td align="center"><strong>enzym</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>fluid</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>human</strong></td>
+<td align="center">0.24905660</td>
+<td align="center">0.18750000</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.50000000</td>
+<td align="center">0.06666667</td>
+<td align="center">0.08333333</td>
+<td align="center">0.17647059</td>
+</tr>
+<tr>
+<td align="center"><strong>identifi</strong></td>
+<td align="center">0.04528302</td>
+<td align="center">0.04044118</td>
+<td align="center">0.14285714</td>
+<td align="center">0.25000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>impact</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.06666667</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>investig</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.03308824</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr>
+<td align="center"><strong>itraq</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr>
+<td align="center"><strong>larg</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.50000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>major</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr>
+<td align="center"><strong>mass</strong></td>
+<td align="center">0.08301887</td>
+<td align="center">0.05147059</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr>
+<td align="center"><strong>modif</strong></td>
+<td align="center">0.026415094</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr>
+<td align="center"><strong>pathway</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.01470588</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>plasma</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.04044118</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr>
+<td align="center"><strong>present</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.16666667</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>proteogenom</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>spectrometri</strong></td>
+<td align="center">0.05283019</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>stimul</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01470588</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr>
+<td align="center"><strong>strategi</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>system</strong></td>
+<td align="center">0.04905660</td>
+<td align="center">0.04411765</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr>
+<td align="center"><strong>time</strong></td>
+<td align="center">0.00754717</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+</tbody>
+</table>
+
+<h2>
+<a id="a-meta-data-and-text-model" class="anchor" href="#a-meta-data-and-text-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>A meta-data and text model</h2>
+
+<p>So let's train now a model using our meta-data predictors together with those
+selected in the previous process using textual data.  </p>
+
+<div class="highlight highlight-r"><pre>set.seed(<span class="pl-c1">123</span>)
+<span class="pl-smi">rfModelMetaText</span> <span class="pl-k">&lt;-</span> randomForest(
+    <span class="pl-smi">project.tags</span> <span class="pl-k">~</span> . <span class="pl-k">-</span> <span class="pl-smi">accession</span> <span class="pl-k">-</span> <span class="pl-smi">publication.date</span> <span class="pl-k">-</span> <span class="pl-smi">project.title</span> <span class="pl-k">-</span> <span class="pl-smi">project.description</span>, 
+    <span class="pl-v">data</span> <span class="pl-k">=</span> <span class="pl-smi">evalTrain</span>)
+<span class="pl-c"># Calculate accuracy on the test set</span>
+<span class="pl-smi">rfPredMetaText</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-smi">rfModelMetaText</span>, <span class="pl-v">newdata</span><span class="pl-k">=</span><span class="pl-smi">evalTest</span>)
+<span class="pl-smi">t</span> <span class="pl-k">&lt;-</span> table(<span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">project.tags</span>, <span class="pl-smi">rfPredMetaText</span>)
+<span class="pl-smi">meta_text_accuracy</span> <span class="pl-k">&lt;-</span> (<span class="pl-smi">t</span>[<span class="pl-c1">1</span>,<span class="pl-c1">1</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">2</span>,<span class="pl-c1">2</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">3</span>,<span class="pl-c1">3</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">4</span>,<span class="pl-c1">4</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">5</span>,<span class="pl-c1">5</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">6</span>,<span class="pl-c1">6</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">7</span>,<span class="pl-c1">7</span>] <span class="pl-k">+</span> <span class="pl-smi">t</span>[<span class="pl-c1">8</span>,<span class="pl-c1">8</span>]) <span class="pl-k">/</span> nrow(<span class="pl-smi">evalTest</span>)</pre></div>
+
+<p>We obtain an accuracy of <strong>0.75</strong>. The improvement is actually
+in better predicting the <code>biological</code> and metaproteomics classes a bit.  </p>
+
+<table>
+<thead>
+<tr>
+<th align="center"> </th>
+<th align="center">Biological</th>
+<th align="center">Biomedical</th>
+<th align="center">Cardiovascular</th>
+<th align="center">Chromosome-centric Human Proteome Project (C-HPP)</th>
+<th align="center">Human Proteome Project</th>
+<th align="center">Metaproteomics</th>
+<th align="center">PRIME-XS Project</th>
+<th align="center">Technical</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><strong>Biological</strong></td>
+<td align="center">40</td>
+<td align="center">8</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Biomedical</strong></td>
+<td align="center">8</td>
+<td align="center">41</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Cardiovascular</strong></td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Chromosome-centric Human Proteome Project (C-HPP)</strong></td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Human Proteome Project</strong></td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Metaproteomics</strong></td>
+<td align="center">2</td>
+<td align="center">3</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>PRIME-XS Project</strong></td>
+<td align="center">1</td>
+<td align="center">2</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center"><strong>Technical</strong></td>
+<td align="center">2</td>
+<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">2</td>
+</tr>
+</tbody>
+</table>
+
+<h1>
+<a id="conclusions" class="anchor" href="#conclusions" aria-hidden="true"><span class="octicon octicon-link"></span></a>Conclusions</h1>
+
+<p>We have seen our two main problems:  </p>
+
+<ul>
+<li>Our data is very unbalanced. There are many more <code>biological</code> and <code>biomedical</code>
+data than anything else.<br>
+</li>
+<li>The previous one becomes more of a problem due to the reduced size of our 
+training data.<br>
+</li>
+</ul>
+
+<p>Hopefully both problems will become less and less important with time, while
+PRIDE gets more submissions.  </p>
+
+<p>We have also seen that incorporating textual data to meta-data makes our model 
+more accurate. Not by a lot, but more accurate after all.  </p>
+
+<p>In terms of our original questions, we don't have enough confidence neither
+to predict tags nor to profile each tag in terms of its associated meta-data
+or textual description (although we have a starting list of candidate terms). 
+However we have seen that there is a relationship, specially when we have 
+enough cases for a given tag to train a model. Additionally we have seen that 
+both things, meta-data and textual description contribute to predict a dataset 
+tag more accuratelly.  </p>
+
+<h1>
+<a id="future-works" class="anchor" href="#future-works" aria-hidden="true"><span class="octicon octicon-link"></span></a>Future works</h1>
+
+<p>Our simple train/split might be making our model overfit the data. A good approach
+would be to use cross validation. However, by using <em>random forests</em> we attenuate
+this problem.  </p>
+
+<p>We also need to try different models and do additional exploratory analysis.
+By doing so we will come with additional insight into the nature of our data. This
+will help to select variables and even to use other techniques such as ensemble
+or cluster-then-predict.  </p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/PRIDE-R">PRIDE-R</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
