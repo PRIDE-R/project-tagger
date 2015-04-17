@@ -3,6 +3,24 @@ Jose A. Dianes
 6 April 2015  
 # Introduction and Goals  
 
+The [PRIDE Archive](http://www.ebi.ac.uk/pride/archive) uses a system of tags 
+to classify datasets. So far these tags are manually assigned by curators. So 
+far the PRIDE teach considers the following tags:  
+
+- Biological  
+- Biomedical  
+- Cardiovascular  
+- Chromosome-centric Human Proteome Project (C-HPP)  
+- Human Proteome Project  
+- Metaproteomics  
+- PRIME-XS Project  
+- Technical  
+
+In the present analysis, by trying to build a model that predict tags, we want
+to find out what are behind those tags. Is it information such as a project
+species or tissue relevant to identify a project as biomedical? Is it that
+information actually hidden in the dataset textual description?  
+
 # Getting and cleaning the data  
 
 Let's start by getting the latest `prideR` version form `GitHub`, together with 
@@ -34,6 +52,8 @@ Kepp only those with a project tag assigned.
 ```r
 archive.df <- subset(archive.df, project.tags!="Not available")
 ```
+
+# The tags distribution  
 
 Now we have 619 tagged projects in the dataset. Let's have a 
 quick look at how these tags are distributed.  
@@ -91,6 +111,49 @@ archive.df$project.tags <- as.factor(archive.df$project.tags)
 archive.df$submissionType <- as.factor(archive.df$submissionType)
 ```
 
+## Exploring metadata  
+
+Let's explore a bit how each piece of metadata is distributed accross each 
+project tag. This might give us some insight into useful predictos if we
+find any species, tissue, etc., more present in a particular tag than others.  
+
+For that we will build a linear model and check the statistical importance of each
+predictor.  
+
+
+```r
+meta_log_model <- glm(
+    project.tags ~ species + tissues + ptm.names + instrument.names + num.assays + submissionType, 
+    data=archive.df, 
+    family=binomial)
+```
+
+```
+## Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred
+```
+
+```r
+meta_log_model_summary <- summary(meta_log_model)
+relevant_meta <- names(which(meta_log_model_summary$coefficients[,4]<0.05))
+```
+
+And we see that the following predictors are statistically significan when 
+predicting tags **assuming a linear relationship**:  
+
+
+|                  Predictor                  |
+|:-------------------------------------------:|
+|         speciesHomo sapiens (Human)         |
+|         speciesMus musculus (Mouse)         |
+|       speciesRattus norvegicus (Rat)        |
+| speciesSus scrofa domesticus (domestic pig) |
+|             submissionTypePRIDE             |
+
+We cannot conclude much due to two factors. First, our relationship is surely
+not linear. And second, our dataset is too small to model better relationships.
+But at least it seems to be some relationship between *species*, and 
+*submission type*, and the project tag.  
+
 ## A meta-data only model  
 
 Let's try now a *Random Forest* model using just metadata predictors. We know 
@@ -122,9 +185,11 @@ rfModelMeta <- randomForest(
 rfPredMeta <- predict(rfModelMeta, newdata=evalTest)
 t <- table(evalTest$project.tags, rfPredMeta)
 meta_accuracy <- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, style = "rmarkdown", split.table = Inf)
 ```
 
+We have a prediction accuracy of **0.7232143** on the test data. We can 
+also see how the model struggles to predict on classes with very few cases and
+does better with large classes.   
 
 
 |                         &nbsp;                          |  Biological  |  Biomedical  |  Cardiovascular  |  Chromosome-centric Human Proteome Project (C-HPP)  |  Human Proteome Project  |  Metaproteomics  |  PRIME-XS Project  |  Technical  |
@@ -137,11 +202,6 @@ pander(t, style = "rmarkdown", split.table = Inf)
 |                   **Metaproteomics**                    |      2       |      3       |        0         |                          0                          |            0             |        0         |         0          |      0      |
 |                  **PRIME-XS Project**                   |      0       |      3       |        0         |                          0                          |            0             |        0         |         0          |      0      |
 |                      **Technical**                      |      2       |      2       |        0         |                          0                          |            0             |        0         |         0          |      1      |
-
-We have a prediction accuracy of **0.7232143** on the test data. We can 
-also see how the model struggles to predict on classes with very few cases and
-does better with large classes.  
-
 
 # Using text fields  
 
@@ -176,7 +236,7 @@ We will also keep just those terms appearing in at least 3 percent of the projec
 ```r
 # Generate term matrix
 dtmAll <- DocumentTermMatrix(corpusAll)
-sparseAll <- removeSparseTerms(dtmAll, 0.97)
+sparseAll <- removeSparseTerms(dtmAll, 0.99)
 allWords <- data.frame(as.matrix(sparseAll))
 
 colnames(allWords) <- make.names(colnames(allWords))
@@ -184,7 +244,7 @@ colnames(allWords) <- make.names(colnames(allWords))
 
 ## Selecting significative terms  
 
-We have ended up with **46 possible predictors**. But we can do 
+We have ended up with **214 possible predictors**. But we can do 
 better than this. We are going to train a *linear model* using them and our
 dependent variable as outcome. Then we will get those variables that are
 statistically significative and incorporate them to the main dataset that
@@ -217,7 +277,58 @@ evalTrain$AllText <- NULL
 evalTest$AllText <- NULL
 ```
 
-We ended up with just **3 predictors** that will be incorporated into our model.  
+We ended up with just **35 predictors** that will be 
+incorporated into our model. These are the terms together with their mean 
+frequencies by project tag (remember they are **stemmed**):  
+
+
+```r
+allWords$project.tag <- archive.df$project.tag
+panderOptions('round', 2)
+panderOptions('keep.trailing.zeros', TRUE)
+pander(t(aggregate(.~project.tag, data=allWords, mean)), style = "rmarkdown", split.table = Inf)
+```
+
+
+|                    |             |             |                |                                                   |                        |                |                  |             |
+|:------------------:|:-----------:|:-----------:|:--------------:|:-------------------------------------------------:|:----------------------:|:--------------:|:----------------:|:-----------:|
+|  **project.tag**   | Biological  | Biomedical  | Cardiovascular | Chromosome-centric Human Proteome Project (C-HPP) | Human Proteome Project | Metaproteomics | PRIME-XS Project |  Technical  |
+|      **aim**       | 0.01132075  | 0.01838235  |   0.14285714   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.08333333    | 0.02941176  |
+|    **analysi**     | 0.19245283  | 0.20220588  |   0.42857143   |                    0.16666667                     |       0.50000000       |   0.13333333   |    0.08333333    | 0.20588235  |
+|     **biolog**     | 0.026415094 | 0.007352941 |  0.000000000   |                    0.000000000                    |      0.000000000       |  0.000000000   |   0.083333333    | 0.000000000 |
+|    **biomark**     | 0.01886792  | 0.02205882  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|     **brain**      | 0.01132075  | 0.01838235  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **combin**     | 0.02264151  | 0.02941176  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|   **comparison**   | 0.003773585 | 0.011029412 |  0.000000000   |                    0.000000000                    |      0.000000000       |  0.000000000   |   0.166666667    | 0.029411765 |
+|   **comprehens**   | 0.03018868  | 0.03308824  |   0.14285714   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|    **control**     | 0.01886792  | 0.01838235  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|    **crucial**     | 0.01132075  | 0.01838235  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|    **dataset**     | 0.02264151  | 0.02573529  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.13333333   |    0.00000000    | 0.02941176  |
+|    **determin**    | 0.018867925 | 0.007352941 |  0.000000000   |                    0.000000000                    |      0.000000000       |  0.066666667   |   0.000000000    | 0.029411765 |
+|    **develop**     | 0.05283019  | 0.03308824  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|     **differ**     | 0.03018868  | 0.04044118  |   0.14285714   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.11764706  |
+|     **digest**     | 0.011320755 | 0.007352941 |  0.142857143   |                    0.000000000                    |      0.000000000       |  0.000000000   |   0.250000000    | 0.058823529 |
+|     **enzym**      | 0.01509434  | 0.01838235  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **fluid**      | 0.02641509  | 0.02573529  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **human**      | 0.24905660  | 0.18750000  |   0.14285714   |                    0.00000000                     |       0.50000000       |   0.06666667   |    0.08333333    | 0.17647059  |
+|    **identifi**    | 0.04528302  | 0.04044118  |   0.14285714   |                    0.25000000                     |       0.00000000       |   0.00000000   |    0.08333333    | 0.02941176  |
+|     **impact**     | 0.01509434  | 0.01102941  |   0.00000000   |                    0.08333333                     |       0.00000000       |   0.06666667   |    0.00000000    | 0.00000000  |
+|    **investig**    | 0.02641509  | 0.03308824  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.08333333    | 0.05882353  |
+|     **itraq**      | 0.011320755 | 0.007352941 |  0.000000000   |                    0.000000000                    |      0.000000000       |  0.000000000   |   0.083333333    | 0.029411765 |
+|      **larg**      | 0.01886792  | 0.01102941  |   0.00000000   |                    0.00000000                     |       0.50000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **major**      | 0.011320755 | 0.007352941 |  0.000000000   |                    0.083333333                    |      0.000000000       |  0.000000000   |   0.083333333    | 0.029411765 |
+|      **mass**      | 0.08301887  | 0.05147059  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.05882353  |
+|     **modif**      | 0.026415094 | 0.007352941 |  0.000000000   |                    0.000000000                    |      0.000000000       |  0.000000000   |   0.000000000    | 0.029411765 |
+|    **pathway**     | 0.02264151  | 0.01470588  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **plasma**     | 0.03018868  | 0.04044118  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.05882353  |
+|    **present**     | 0.02264151  | 0.02205882  |   0.00000000   |                    0.16666667                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|  **proteogenom**   | 0.01886792  | 0.01102941  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.13333333   |    0.00000000    | 0.00000000  |
+|  **spectrometri**  | 0.05283019  | 0.02573529  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|     **stimul**     | 0.01509434  | 0.01470588  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.02941176  |
+|    **strategi**    | 0.02641509  | 0.01838235  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|     **system**     | 0.04905660  | 0.04411765  |   0.14285714   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+|      **time**      | 0.00754717  | 0.02205882  |   0.00000000   |                    0.00000000                     |       0.00000000       |   0.00000000   |    0.00000000    | 0.00000000  |
+
 
 ## A meta-data and text model  
 
@@ -234,34 +345,22 @@ rfModelMetaText <- randomForest(
 rfPredMetaText <- predict(rfModelMetaText, newdata=evalTest)
 t <- table(evalTest$project.tags, rfPredMetaText)
 meta_text_accuracy <- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, split.table = Inf)
 ```
 
-
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-           &nbsp;             Biological   Biomedical   Cardiovascular   Chromosome-centric Human   Human Proteome Project   Metaproteomics   PRIME-XS Project   Technical 
-                                                                         Proteome Project (C-HPP)                                                                          
----------------------------- ------------ ------------ ---------------- -------------------------- ------------------------ ---------------- ------------------ -----------
-       **Biological**             37           9              0                     0                         0                    1                 0               1     
-
-       **Biomedical**             8            41             0                     0                         0                    0                 0               0     
-
-     **Cardiovascular**           0            1              0                     0                         0                    0                 0               0     
-
- **Chromosome-centric Human       0            0              0                     1                         0                    0                 0               0     
- Proteome Project (C-HPP)**                                                                                                                                                
-
- **Human Proteome Project**       0            0              0                     0                         0                    0                 0               0     
-
-     **Metaproteomics**           2            1              0                     0                         0                    2                 0               0     
-
-    **PRIME-XS Project**          0            3              0                     0                         0                    0                 0               0     
-
-       **Technical**              2            2              0                     0                         0                    0                 0               1     
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-We obtain an accuracy of **0.7321429**. The improvement is actually
+We obtain an accuracy of **0.75**. The improvement is actually
 in better predicting the `biological` and metaproteomics classes a bit.  
+
+
+|                         &nbsp;                          |  Biological  |  Biomedical  |  Cardiovascular  |  Chromosome-centric Human Proteome Project (C-HPP)  |  Human Proteome Project  |  Metaproteomics  |  PRIME-XS Project  |  Technical  |
+|:-------------------------------------------------------:|:------------:|:------------:|:----------------:|:---------------------------------------------------:|:------------------------:|:----------------:|:------------------:|:-----------:|
+|                     **Biological**                      |      40      |      8       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                     **Biomedical**                      |      8       |      41      |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                   **Cardiovascular**                    |      0       |      1       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|  **Chromosome-centric Human Proteome Project (C-HPP)**  |      0       |      0       |        0         |                          1                          |            0             |        0         |         0          |      0      |
+|               **Human Proteome Project**                |      0       |      0       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                   **Metaproteomics**                    |      2       |      3       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                  **PRIME-XS Project**                   |      1       |      2       |        0         |                          0                          |            0             |        0         |         0          |      0      |
+|                      **Technical**                      |      2       |      1       |        0         |                          0                          |            0             |        0         |         0          |      2      |
 
 # Conclusions  
 
@@ -277,6 +376,14 @@ PRIDE gets more submissions.
 
 We have also seen that incorporating textual data to meta-data makes our model 
 more accurate. Not by a lot, but more accurate after all.  
+
+In terms of our original questions, we don't have enough confidence neither
+to predict tags nor to profile each tag in terms of its associated meta-data
+or textual description (although we have a starting list of candidate terms). 
+However we have seen that there is a relationship, specially when we have 
+enough cases for a given tag to train a model. Additionally we have seen that 
+both things, meta-data and textual description contribute to predict a dataset 
+tag more accuratelly.  
 
 # Future works  
 

@@ -66,9 +66,40 @@ img {
 <h4 class="date"><em>6 April 2015</em></h4>
 </div>
 
+<div id="TOC">
+<ul>
+<li><a href="#introduction-and-goals">Introduction and Goals</a></li>
+<li><a href="#getting-and-cleaning-the-data">Getting and cleaning the data</a></li>
+<li><a href="#the-tags-distribution">The tags distribution</a></li>
+<li><a href="#using-meta-data">Using meta-data</a><ul>
+<li><a href="#preparing-meta-data">Preparing meta-data</a></li>
+<li><a href="#exploring-metadata">Exploring metadata</a></li>
+<li><a href="#a-meta-data-only-model">A meta-data only model</a></li>
+</ul></li>
+<li><a href="#using-text-fields">Using text fields</a><ul>
+<li><a href="#preparing-the-corpus">Preparing the corpus</a></li>
+<li><a href="#selecting-significative-terms">Selecting significative terms</a></li>
+<li><a href="#a-meta-data-and-text-model">A meta-data and text model</a></li>
+</ul></li>
+<li><a href="#conclusions">Conclusions</a></li>
+<li><a href="#future-works">Future works</a></li>
+</ul>
+</div>
 
 <div id="introduction-and-goals" class="section level1">
 <h1>Introduction and Goals</h1>
+<p>The <a href="http://www.ebi.ac.uk/pride/archive">PRIDE Archive</a> uses a system of tags to classify datasets. So far these tags are manually assigned by curators. So far the PRIDE teach considers the following tags:</p>
+<ul>
+<li>Biological<br /></li>
+<li>Biomedical<br /></li>
+<li>Cardiovascular<br /></li>
+<li>Chromosome-centric Human Proteome Project (C-HPP)<br /></li>
+<li>Human Proteome Project<br /></li>
+<li>Metaproteomics<br /></li>
+<li>PRIME-XS Project<br /></li>
+<li>Technical</li>
+</ul>
+<p>In the present analysis, by trying to build a model that predict tags, we want to find out what are behind those tags. Is it information such as a project species or tissue relevant to identify a project as biomedical? Is it that information actually hidden in the dataset textual description?</p>
 </div>
 <div id="getting-and-cleaning-the-data" class="section level1">
 <h1>Getting and cleaning the data</h1>
@@ -86,6 +117,9 @@ library(pander)</code></pre>
 <pre class="r"><code>archive.df &lt;- as.data.frame(search.list.ProjectSummary(&quot;&quot;,0,20000))</code></pre>
 <p>Kepp only those with a project tag assigned.</p>
 <pre class="r"><code>archive.df &lt;- subset(archive.df, project.tags!=&quot;Not available&quot;)</code></pre>
+</div>
+<div id="the-tags-distribution" class="section level1">
+<h1>The tags distribution</h1>
 <p>Now we have 619 tagged projects in the dataset. Let’s have a quick look at how these tags are distributed.</p>
 <pre class="r"><code>ggplot(data=archive.df, aes(x=as.factor(archive.df$project.tags))) +
     geom_bar() +
@@ -124,6 +158,44 @@ archive.df$instrument.names &lt;- as.factor(archive.df$instrument.names)
 archive.df$project.tags &lt;- as.factor(archive.df$project.tags)
 archive.df$submissionType &lt;- as.factor(archive.df$submissionType)</code></pre>
 </div>
+<div id="exploring-metadata" class="section level2">
+<h2>Exploring metadata</h2>
+<p>Let’s explore a bit how each piece of metadata is distributed accross each project tag. This might give us some insight into useful predictos if we find any species, tissue, etc., more present in a particular tag than others.</p>
+<p>For that we will build a linear model and check the statistical importance of each predictor.</p>
+<pre class="r"><code>meta_log_model &lt;- glm(
+    project.tags ~ species + tissues + ptm.names + instrument.names + num.assays + submissionType, 
+    data=archive.df, 
+    family=binomial)</code></pre>
+<pre><code>## Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred</code></pre>
+<pre class="r"><code>meta_log_model_summary &lt;- summary(meta_log_model)
+relevant_meta &lt;- names(which(meta_log_model_summary$coefficients[,4]&lt;0.05))</code></pre>
+<p>And we see that the following predictors are statistically significan when predicting tags <strong>assuming a linear relationship</strong>:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="center">Predictor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">speciesHomo sapiens (Human)</td>
+</tr>
+<tr class="even">
+<td align="center">speciesMus musculus (Mouse)</td>
+</tr>
+<tr class="odd">
+<td align="center">speciesRattus norvegicus (Rat)</td>
+</tr>
+<tr class="even">
+<td align="center">speciesSus scrofa domesticus (domestic pig)</td>
+</tr>
+<tr class="odd">
+<td align="center">submissionTypePRIDE</td>
+</tr>
+</tbody>
+</table>
+<p>We cannot conclude much due to two factors. First, our relationship is surely not linear. And second, our dataset is too small to model better relationships. But at least it seems to be some relationship between <em>species</em>, and <em>submission type</em>, and the project tag.</p>
+</div>
 <div id="a-meta-data-only-model" class="section level2">
 <h2>A meta-data only model</h2>
 <p>Let’s try now a <em>Random Forest</em> model using just metadata predictors. We know our dependent variable is very skewed, so don’t expect too much accuracy. We decide for this type of model due to its success with non-linear problems.</p>
@@ -141,8 +213,8 @@ rfModelMeta &lt;- randomForest(
 # Calculate accuracy on the test set
 rfPredMeta &lt;- predict(rfModelMeta, newdata=evalTest)
 t &lt;- table(evalTest$project.tags, rfPredMeta)
-meta_accuracy &lt;- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, style = &quot;rmarkdown&quot;, split.table = Inf)</code></pre>
+meta_accuracy &lt;- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)</code></pre>
+<p>We have a prediction accuracy of <strong>0.7232143</strong> on the test data. We can also see how the model struggles to predict on classes with very few cases and does better with large classes.</p>
 <table>
 <thead>
 <tr class="header">
@@ -248,7 +320,6 @@ pander(t, style = &quot;rmarkdown&quot;, split.table = Inf)</code></pre>
 </tr>
 </tbody>
 </table>
-<p>We have a prediction accuracy of <strong>0.7232143</strong> on the test data. We can also see how the model struggles to predict on classes with very few cases and does better with large classes.</p>
 </div>
 </div>
 <div id="using-text-fields" class="section level1">
@@ -271,14 +342,14 @@ corpusAll &lt;- tm_map(corpusAll, stemDocument)</code></pre>
 <p>We will also keep just those terms appearing in at least 3 percent of the projects.</p>
 <pre class="r"><code># Generate term matrix
 dtmAll &lt;- DocumentTermMatrix(corpusAll)
-sparseAll &lt;- removeSparseTerms(dtmAll, 0.97)
+sparseAll &lt;- removeSparseTerms(dtmAll, 0.99)
 allWords &lt;- data.frame(as.matrix(sparseAll))
 
 colnames(allWords) &lt;- make.names(colnames(allWords))</code></pre>
 </div>
 <div id="selecting-significative-terms" class="section level2">
 <h2>Selecting significative terms</h2>
-<p>We have ended up with <strong>46 possible predictors</strong>. But we can do better than this. We are going to train a <em>linear model</em> using them and our dependent variable as outcome. Then we will get those variables that are statistically significative and incorporate them to the main dataset that we will use with our final model.</p>
+<p>We have ended up with <strong>214 possible predictors</strong>. But we can do better than this. We are going to train a <em>linear model</em> using them and our dependent variable as outcome. Then we will get those variables that are statistically significative and incorporate them to the main dataset that we will use with our final model.</p>
 <pre class="r"><code># Find most significative terms
 allWordsTrain2 &lt;- head(allWords, nrow(evalTrain))
 allWordsTrain2$Popular &lt;- evalTrain$project.tag
@@ -302,7 +373,411 @@ evalTest &lt;- cbind(evalTest, allWordsTest)
 # Remove all text variable since we don't need it
 evalTrain$AllText &lt;- NULL
 evalTest$AllText &lt;- NULL</code></pre>
-<p>We ended up with just <strong>3 predictors</strong> that will be incorporated into our model.</p>
+<p>We ended up with just <strong>35 predictors</strong> that will be incorporated into our model. These are the terms together with their mean frequencies by project tag (remember they are <strong>stemmed</strong>):</p>
+<pre class="r"><code>allWords$project.tag &lt;- archive.df$project.tag
+panderOptions('round', 2)
+panderOptions('keep.trailing.zeros', TRUE)
+pander(t(aggregate(.~project.tag, data=allWords, mean)), style = &quot;rmarkdown&quot;, split.table = Inf)</code></pre>
+<table>
+<tbody>
+<tr class="odd">
+<td align="center"><strong>project.tag</strong></td>
+<td align="center">Biological</td>
+<td align="center">Biomedical</td>
+<td align="center">Cardiovascular</td>
+<td align="center">Chromosome-centric Human Proteome Project (C-HPP)</td>
+<td align="center">Human Proteome Project</td>
+<td align="center">Metaproteomics</td>
+<td align="center">PRIME-XS Project</td>
+<td align="center">Technical</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>aim</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>analysi</strong></td>
+<td align="center">0.19245283</td>
+<td align="center">0.20220588</td>
+<td align="center">0.42857143</td>
+<td align="center">0.16666667</td>
+<td align="center">0.50000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.08333333</td>
+<td align="center">0.20588235</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>biolog</strong></td>
+<td align="center">0.026415094</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.000000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>biomark</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>brain</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>combin</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02941176</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>comparison</strong></td>
+<td align="center">0.003773585</td>
+<td align="center">0.011029412</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.166666667</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>comprehens</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.03308824</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>control</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>crucial</strong></td>
+<td align="center">0.01132075</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>dataset</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>determin</strong></td>
+<td align="center">0.018867925</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.066666667</td>
+<td align="center">0.000000000</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>develop</strong></td>
+<td align="center">0.05283019</td>
+<td align="center">0.03308824</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>differ</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.04044118</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.11764706</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>digest</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.142857143</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.250000000</td>
+<td align="center">0.058823529</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>enzym</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>fluid</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>human</strong></td>
+<td align="center">0.24905660</td>
+<td align="center">0.18750000</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.50000000</td>
+<td align="center">0.06666667</td>
+<td align="center">0.08333333</td>
+<td align="center">0.17647059</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>identifi</strong></td>
+<td align="center">0.04528302</td>
+<td align="center">0.04044118</td>
+<td align="center">0.14285714</td>
+<td align="center">0.25000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>impact</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.06666667</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>investig</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.03308824</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.08333333</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>itraq</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>larg</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.50000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>major</strong></td>
+<td align="center">0.011320755</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.083333333</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>mass</strong></td>
+<td align="center">0.08301887</td>
+<td align="center">0.05147059</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>modif</strong></td>
+<td align="center">0.026415094</td>
+<td align="center">0.007352941</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.000000000</td>
+<td align="center">0.029411765</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>pathway</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.01470588</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>plasma</strong></td>
+<td align="center">0.03018868</td>
+<td align="center">0.04044118</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.05882353</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>present</strong></td>
+<td align="center">0.02264151</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.16666667</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>proteogenom</strong></td>
+<td align="center">0.01886792</td>
+<td align="center">0.01102941</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.13333333</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>spectrometri</strong></td>
+<td align="center">0.05283019</td>
+<td align="center">0.02573529</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>stimul</strong></td>
+<td align="center">0.01509434</td>
+<td align="center">0.01470588</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.02941176</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>strategi</strong></td>
+<td align="center">0.02641509</td>
+<td align="center">0.01838235</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="odd">
+<td align="center"><strong>system</strong></td>
+<td align="center">0.04905660</td>
+<td align="center">0.04411765</td>
+<td align="center">0.14285714</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+<tr class="even">
+<td align="center"><strong>time</strong></td>
+<td align="center">0.00754717</td>
+<td align="center">0.02205882</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+<td align="center">0.00000000</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="a-meta-data-and-text-model" class="section level2">
 <h2>A meta-data and text model</h2>
@@ -314,20 +789,9 @@ rfModelMetaText &lt;- randomForest(
 # Calculate accuracy on the test set
 rfPredMetaText &lt;- predict(rfModelMetaText, newdata=evalTest)
 t &lt;- table(evalTest$project.tags, rfPredMetaText)
-meta_text_accuracy &lt;- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)
-pander(t, split.table = Inf)</code></pre>
+meta_text_accuracy &lt;- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)</code></pre>
+<p>We obtain an accuracy of <strong>0.75</strong>. The improvement is actually in better predicting the <code>biological</code> and metaproteomics classes a bit.</p>
 <table>
-<colgroup>
-<col width="16%"></col>
-<col width="7%"></col>
-<col width="7%"></col>
-<col width="9%"></col>
-<col width="15%"></col>
-<col width="14%"></col>
-<col width="9%"></col>
-<col width="11%"></col>
-<col width="6%"></col>
-</colgroup>
 <thead>
 <tr class="header">
 <th align="center"> </th>
@@ -344,14 +808,14 @@ pander(t, split.table = Inf)</code></pre>
 <tbody>
 <tr class="odd">
 <td align="center"><strong>Biological</strong></td>
-<td align="center">37</td>
-<td align="center">9</td>
+<td align="center">40</td>
+<td align="center">8</td>
 <td align="center">0</td>
 <td align="center">0</td>
 <td align="center">0</td>
-<td align="center">1</td>
 <td align="center">0</td>
-<td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
 </tr>
 <tr class="even">
 <td align="center"><strong>Biomedical</strong></td>
@@ -400,18 +864,18 @@ pander(t, split.table = Inf)</code></pre>
 <tr class="even">
 <td align="center"><strong>Metaproteomics</strong></td>
 <td align="center">2</td>
-<td align="center">1</td>
+<td align="center">3</td>
 <td align="center">0</td>
 <td align="center">0</td>
 <td align="center">0</td>
-<td align="center">2</td>
+<td align="center">0</td>
 <td align="center">0</td>
 <td align="center">0</td>
 </tr>
 <tr class="odd">
 <td align="center"><strong>PRIME-XS Project</strong></td>
-<td align="center">0</td>
-<td align="center">3</td>
+<td align="center">1</td>
+<td align="center">2</td>
 <td align="center">0</td>
 <td align="center">0</td>
 <td align="center">0</td>
@@ -422,17 +886,16 @@ pander(t, split.table = Inf)</code></pre>
 <tr class="even">
 <td align="center"><strong>Technical</strong></td>
 <td align="center">2</td>
-<td align="center">2</td>
-<td align="center">0</td>
-<td align="center">0</td>
-<td align="center">0</td>
-<td align="center">0</td>
-<td align="center">0</td>
 <td align="center">1</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">0</td>
+<td align="center">2</td>
 </tr>
 </tbody>
 </table>
-<p>We obtain an accuracy of <strong>0.7321429</strong>. The improvement is actually in better predicting the <code>biological</code> and metaproteomics classes a bit.</p>
 </div>
 </div>
 <div id="conclusions" class="section level1">
@@ -444,6 +907,7 @@ pander(t, split.table = Inf)</code></pre>
 </ul>
 <p>Hopefully both problems will become less and less important with time, while PRIDE gets more submissions.</p>
 <p>We have also seen that incorporating textual data to meta-data makes our model more accurate. Not by a lot, but more accurate after all.</p>
+<p>In terms of our original questions, we don’t have enough confidence neither to predict tags nor to profile each tag in terms of its associated meta-data or textual description (although we have a starting list of candidate terms). However we have seen that there is a relationship, specially when we have enough cases for a given tag to train a model. Additionally we have seen that both things, meta-data and textual description contribute to predict a dataset tag more accuratelly.</p>
 </div>
 <div id="future-works" class="section level1">
 <h1>Future works</h1>
