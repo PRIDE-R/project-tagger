@@ -35,7 +35,7 @@ Kepp only those with a project tag assigned.
 archive.df <- subset(archive.df, project.tags!="Not available")
 ```
 
-Now we have 597 tagged projects in the dataset. Let's have a 
+Now we have 619 tagged projects in the dataset. Let's have a 
 quick look at how these tags are distributed.  
 
 
@@ -130,9 +130,9 @@ pander(t, split.table = Inf)
            &nbsp;             Biological   Biomedical   Cardiovascular   Chromosome-centric Human   Human Proteome Project   Metaproteomics   PRIME-XS Project   Technical 
                                                                          Proteome Project (C-HPP)                                                                          
 ---------------------------- ------------ ------------ ---------------- -------------------------- ------------------------ ---------------- ------------------ -----------
-       **Biological**             37           9              0                     0                         0                    1                 0               0     
+       **Biological**             38           8              0                     0                         0                    1                 0               1     
 
-       **Biomedical**             7            39             0                     0                         0                    0                 0               0     
+       **Biomedical**             8            41             0                     0                         0                    0                 0               0     
 
      **Cardiovascular**           0            1              0                     0                         0                    0                 0               0     
 
@@ -143,12 +143,12 @@ pander(t, split.table = Inf)
 
      **Metaproteomics**           2            3              0                     0                         0                    0                 0               0     
 
-    **PRIME-XS Project**          1            2              0                     0                         0                    0                 0               0     
+    **PRIME-XS Project**          0            3              0                     0                         0                    0                 0               0     
 
        **Technical**              2            2              0                     0                         0                    0                 0               1     
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-We have a prediction accuracy of **0.7222222** on the test data. We can 
+We have a prediction accuracy of **0.7232143** on the test data. We can 
 also see how the model struggles to predict on classes with very few cases and
 does better with large classes.  
 
@@ -194,7 +194,7 @@ colnames(allWords) <- make.names(colnames(allWords))
 
 ## Selecting significative terms  
 
-We have ended up with **48 possible predictors**. But we can do 
+We have ended up with **46 possible predictors**. But we can do 
 better than this. We are going to train a *linear model* using them and our
 dependent variable as outcome. Then we will get those variables that are
 statistically significative and incorporate them to the main dataset that
@@ -227,7 +227,7 @@ evalTrain$AllText <- NULL
 evalTest$AllText <- NULL
 ```
 
-We ended up with just **4 predictors** that will be incorporated into our model.  
+We ended up with just **3 predictors** that will be incorporated into our model.  
 
 ## A meta-data and text model  
 
@@ -252,9 +252,9 @@ pander(t, split.table = Inf)
            &nbsp;             Biological   Biomedical   Cardiovascular   Chromosome-centric Human   Human Proteome Project   Metaproteomics   PRIME-XS Project   Technical 
                                                                          Proteome Project (C-HPP)                                                                          
 ---------------------------- ------------ ------------ ---------------- -------------------------- ------------------------ ---------------- ------------------ -----------
-       **Biological**             39           7              0                     0                         0                    1                 0               0     
+       **Biological**             37           9              0                     0                         0                    1                 0               1     
 
-       **Biomedical**             7            39             0                     0                         0                    0                 0               0     
+       **Biomedical**             8            41             0                     0                         0                    0                 0               0     
 
      **Cardiovascular**           0            1              0                     0                         0                    0                 0               0     
 
@@ -270,7 +270,8 @@ pander(t, split.table = Inf)
        **Technical**              2            2              0                     0                         0                    0                 0               1     
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-We obtain an accuracy of **0.7592593**.   
+We obtain an accuracy of **0.7321429**. The improvement is actually
+in better predicting the `biological` and metaproteomics classes a bit.  
 
 # Conclusions  
 

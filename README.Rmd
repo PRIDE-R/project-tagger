@@ -111,7 +111,7 @@ evalTest <- archive.df[spl==F,]
 
 And now train the model.  
 
-```{r}
+```{r, results='asis'}
 set.seed(123)
 rfModelMeta <- randomForest(
     project.tags ~ species + tissues + ptm.names + instrument.names + submissionType, 
