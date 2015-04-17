@@ -377,7 +377,7 @@ evalTest$AllText &lt;- NULL</code></pre>
 <pre class="r"><code>allWords$project.tag &lt;- archive.df$project.tag
 panderOptions('round', 2)
 panderOptions('keep.trailing.zeros', TRUE)
-pander(t(aggregate(.~project.tag, data=allWords, mean)), style = &quot;rmarkdown&quot;, split.table = Inf)</code></pre>
+pander(t(aggregate(.~project.tag, data=allWords, mean)), round=4, style = &quot;rmarkdown&quot;, split.table = Inf)</code></pre>
 <table>
 <tbody>
 <tr class="odd">
@@ -790,7 +790,7 @@ rfModelMetaText &lt;- randomForest(
 rfPredMetaText &lt;- predict(rfModelMetaText, newdata=evalTest)
 t &lt;- table(evalTest$project.tags, rfPredMetaText)
 meta_text_accuracy &lt;- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7,7] + t[8,8]) / nrow(evalTest)</code></pre>
-<p>We obtain an accuracy of <strong>0.75</strong>. The improvement is actually in better predicting the <code>biological</code> and metaproteomics classes a bit.</p>
+<p>We obtain an accuracy of <strong>0.75</strong>. The improvement is actually in better predicting the <code>biological</code> and <code>technical</code> classes a bit.</p>
 <table>
 <thead>
 <tr class="header">

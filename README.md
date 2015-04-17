@@ -286,7 +286,7 @@ frequencies by project tag (remember they are **stemmed**):
 allWords$project.tag <- archive.df$project.tag
 panderOptions('round', 2)
 panderOptions('keep.trailing.zeros', TRUE)
-pander(t(aggregate(.~project.tag, data=allWords, mean)), style = "rmarkdown", split.table = Inf)
+pander(t(aggregate(.~project.tag, data=allWords, mean)), round=4, style = "rmarkdown", split.table = Inf)
 ```
 
 
@@ -348,7 +348,7 @@ meta_text_accuracy <- (t[1,1] + t[2,2] + t[3,3] + t[4,4] + t[5,5] + t[6,6] + t[7
 ```
 
 We obtain an accuracy of **0.75**. The improvement is actually
-in better predicting the `biological` and metaproteomics classes a bit.  
+in better predicting the `biological` and `technical` classes a bit.  
 
 
 |                         &nbsp;                          |  Biological  |  Biomedical  |  Cardiovascular  |  Chromosome-centric Human Proteome Project (C-HPP)  |  Human Proteome Project  |  Metaproteomics  |  PRIME-XS Project  |  Technical  |
