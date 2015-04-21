@@ -44,6 +44,7 @@ require(tm)
 library(caTools)
 library(randomForest)
 library(pander)
+library(wordcloud)
 ```
 
 Now we get all the projects available in the archive.  
@@ -58,7 +59,7 @@ Kepp only those with a project tag assigned.
 archive.df <- subset(archive.df, project.tags!="Not available")
 ```
 
-# The tags distribution  
+# Tag distribution  
 
 Now we have `r nrow(archive.df)` tagged projects in the dataset. Let's have a 
 quick look at how these tags are distributed.  
@@ -218,6 +219,86 @@ allWords <- data.frame(as.matrix(sparseAll))
 colnames(allWords) <- make.names(colnames(allWords))
 ```
 
+## Word clouds  
+
+Another useful thing we could do in order to better understand our data is to 
+visualise what words appear more often for a given tag. Doing this visually 
+allows us to grasp the information quickly.  
+
+We can use the same approach as before to get the data ready.  
+
+```{r, warning=FALSE}
+corpusCloud <- Corpus(VectorSource(c(evalTrain$AllText, evalTest$AllText)))
+corpusCloud <- tm_map(corpusCloud, tolower)
+corpusCloud <- tm_map(corpusCloud, PlainTextDocument)
+corpusCloud <- tm_map(corpusCloud, removePunctuation)
+corpusCloud <- tm_map(corpusCloud, removeWords, stopwords("english"))
+corpusCloud <- tm_map(corpusCloud, stripWhitespace)
+dtmCloud <- DocumentTermMatrix(corpusCloud)
+allCloud <- data.frame(as.matrix(dtmCloud))
+```
+
+### Biological word cloud    
+
+```{r}
+allCloudBiological <- allCloud[archive.df$project.tag=="Biological",]
+wordcloud(colnames(allCloudBiological), colSums(allCloudBiological), scale=c(2,0.25))
+```
+
+### Biomedical word cloud    
+
+```{r}
+allCloudBiomedical <- allCloud[archive.df$project.tag=="Biomedical",]
+wordcloud(colnames(allCloudBiomedical), colSums(allCloudBiomedical), scale=c(2,0.25))
+```
+
+### Cardiovascular word cloud    
+
+```{r}
+allCloudCardiovascular <- allCloud[archive.df$project.tag=="Cardiovascular",]
+wordcloud(colnames(allCloudCardiovascular), colSums(allCloudCardiovascular), scale=c(2,0.25))
+```
+
+### C-HPP word cloud    
+
+```{r}
+allCloudCHPP <- allCloud[archive.df$project.tag=="Chromosome-centric Human Proteome Project (C-HPP)",]
+wordcloud(colnames(allCloudCHPP), colSums(allCloudCHPP), scale=c(2,0.25))
+```
+
+### Metaproteomics word cloud    
+
+```{r}
+allCloudMetaproteomics <- allCloud[archive.df$project.tag=="Metaproteomics",]
+wordcloud(colnames(allCloudMetaproteomics), colSums(allCloudMetaproteomics), scale=c(2,0.25))
+```
+
+### PRIME-XS Project word cloud    
+
+```{r}
+allCloudPrimeXs <- allCloud[archive.df$project.tag=="PRIME-XS Project",]
+wordcloud(colnames(allCloudPrimeXs), colSums(allCloudPrimeXs), scale=c(2,0.25))
+```
+
+### Technical word cloud    
+
+```{r}
+allCloudTechnical <- allCloud[archive.df$project.tag=="Technical",]
+wordcloud(colnames(allCloudTechnical), colSums(allCloudTechnical), scale=c(2,0.25))
+```
+
+### Some thoughts about word clouds  
+
+One obvious conclusion that emerges from these charts is that some tags are clearly
+underrepresented. This will make our models not very efficient. However we
+can count on this situation to change in the future while more and more projects
+are submitted to PRIDE Archive.  
+
+We can also see that some words rank top in most project tags, and are probably
+not very useful as predictors. Specially we refer to the family of terms related
+to proteomics, proteins, etc. We hope these terms will be filtered out in our
+model selection process in the next section.  
+
 ## Selecting significative terms  
 
 We have ended up with **`r ncol(allWords)` possible predictors**. But we can do 
@@ -300,7 +381,11 @@ Hopefully both problems will become less and less important with time, while
 PRIDE gets more submissions.  
 
 We have also seen that incorporating textual data to meta-data makes our model 
-more accurate. Not by a lot, but more accurate after all.  
+more accurate. Not by a lot, but more accurate after all. In the exploration 
+and selection process for significative terms, we have seen that using a linear
+model selected significative terms. We have also seen that terms that appear
+not relevant in our word cloud charts, were removed by this model selection
+process.  
 
 In terms of our original questions, we don't have enough confidence neither
 to predict tags nor to profile each tag in terms of its associated meta-data
