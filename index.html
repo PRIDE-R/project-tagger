@@ -372,6 +372,93 @@ lowercase, remove punctuation and stopwords, and apply stemming.   </p>
 colnames(<span class="pl-smi">allWords</span>) <span class="pl-k">&lt;-</span> make.names(colnames(<span class="pl-smi">allWords</span>))</pre></div>
 
 <h2>
+<a id="word-clouds" class="anchor" href="#word-clouds" aria-hidden="true"><span class="octicon octicon-link"></span></a>Word clouds</h2>
+
+<p>Another useful thing we could do in order to better understand our data is to 
+visualise what words appear more often for a given tag. Doing this visually 
+allows us to grasp the information quickly.  </p>
+
+<p>We can use the same approach as before to get the data ready.  </p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> Corpus(VectorSource(c(<span class="pl-smi">evalTrain</span><span class="pl-k">$</span><span class="pl-smi">AllText</span>, <span class="pl-smi">evalTest</span><span class="pl-k">$</span><span class="pl-smi">AllText</span>)))
+<span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusCloud</span>, <span class="pl-smi">tolower</span>)
+<span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusCloud</span>, <span class="pl-smi">PlainTextDocument</span>)
+<span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusCloud</span>, <span class="pl-smi">removePunctuation</span>)
+<span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusCloud</span>, <span class="pl-smi">removeWords</span>, stopwords(<span class="pl-s"><span class="pl-pds">"</span>english<span class="pl-pds">"</span></span>))
+<span class="pl-smi">corpusCloud</span> <span class="pl-k">&lt;-</span> tm_map(<span class="pl-smi">corpusCloud</span>, <span class="pl-smi">stripWhitespace</span>)
+<span class="pl-smi">dtmCloud</span> <span class="pl-k">&lt;-</span> DocumentTermMatrix(<span class="pl-smi">corpusCloud</span>)
+<span class="pl-smi">allCloud</span> <span class="pl-k">&lt;-</span> <span class="pl-k">data.frame</span>(as.matrix(<span class="pl-smi">dtmCloud</span>))</pre></div>
+
+<h3>
+<a id="biological-word-cloud" class="anchor" href="#biological-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>Biological word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudBiological</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Biological<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudBiological</span>), colSums(<span class="pl-smi">allCloudBiological</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-14-1.png" alt=""> </p>
+
+<h3>
+<a id="biomedical-word-cloud" class="anchor" href="#biomedical-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>Biomedical word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudBiomedical</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Biomedical<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudBiomedical</span>), colSums(<span class="pl-smi">allCloudBiomedical</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-15-1.png" alt=""> </p>
+
+<h3>
+<a id="cardiovascular-word-cloud" class="anchor" href="#cardiovascular-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cardiovascular word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudCardiovascular</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Cardiovascular<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudCardiovascular</span>), colSums(<span class="pl-smi">allCloudCardiovascular</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-16-1.png" alt=""> </p>
+
+<h3>
+<a id="c-hpp-word-cloud" class="anchor" href="#c-hpp-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>C-HPP word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudCHPP</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Chromosome-centric Human Proteome Project (C-HPP)<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudCHPP</span>), colSums(<span class="pl-smi">allCloudCHPP</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-17-1.png" alt=""> </p>
+
+<h3>
+<a id="metaproteomics-word-cloud" class="anchor" href="#metaproteomics-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>Metaproteomics word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudMetaproteomics</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Metaproteomics<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudMetaproteomics</span>), colSums(<span class="pl-smi">allCloudMetaproteomics</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-18-1.png" alt=""> </p>
+
+<h3>
+<a id="prime-xs-project-word-cloud" class="anchor" href="#prime-xs-project-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>PRIME-XS Project word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudPrimeXs</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>PRIME-XS Project<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudPrimeXs</span>), colSums(<span class="pl-smi">allCloudPrimeXs</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-19-1.png" alt=""> </p>
+
+<h3>
+<a id="technical-word-cloud" class="anchor" href="#technical-word-cloud" aria-hidden="true"><span class="octicon octicon-link"></span></a>Technical word cloud</h3>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">allCloudTechnical</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">allCloud</span>[<span class="pl-smi">archive.df</span><span class="pl-k">$</span><span class="pl-smi">project.tag</span><span class="pl-k">==</span><span class="pl-s"><span class="pl-pds">"</span>Technical<span class="pl-pds">"</span></span>,]
+wordcloud(colnames(<span class="pl-smi">allCloudTechnical</span>), colSums(<span class="pl-smi">allCloudTechnical</span>), <span class="pl-v">scale</span><span class="pl-k">=</span>c(<span class="pl-c1">2</span>,<span class="pl-c1">0.25</span>))</pre></div>
+
+<p><img src="README_files/figure-html/unnamed-chunk-20-1.png" alt=""> </p>
+
+<h3>
+<a id="some-thoughts-about-word-clouds" class="anchor" href="#some-thoughts-about-word-clouds" aria-hidden="true"><span class="octicon octicon-link"></span></a>Some thoughts about word clouds</h3>
+
+<p>One obvious conclusion that emerges from these charts is that some tags are clearly
+underrepresented. This will make our models not very efficient. However we
+can count on this situation to change in the future while more and more projects
+are submitted to PRIDE Archive.  </p>
+
+<p>We can also see that some words rank top in most project tags, and are probably
+not very useful as predictors. Specially we refer to the family of terms related
+to proteomics, proteins, etc. We hope these terms will be filtered out in our
+model selection process in the next section.  </p>
+
+<h2>
 <a id="selecting-significative-terms" class="anchor" href="#selecting-significative-terms" aria-hidden="true"><span class="octicon octicon-link"></span></a>Selecting significative terms</h2>
 
 <p>We have ended up with <strong>214 possible predictors</strong>. But we can do 
